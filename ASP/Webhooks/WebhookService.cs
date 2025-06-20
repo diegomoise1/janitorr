@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using WebhookEvent = JanitorAspNet.Configuration.WebhookEvent;
+using WebhookEndpoint = JanitorAspNet.Configuration.WebhookEndpoint;
 
 namespace JanitorAspNet.Webhooks;
 
@@ -19,6 +21,12 @@ public interface IWebhookService
     Task SendHealthCheckAsync();
     Task<List<WebhookEndpointStatus>> GetEndpointStatusAsync();
     Task TestEndpointAsync(string endpointName);
+
+    // Add missing webhook methods for background service integration
+    Task SendCleanupWebhookAsync(CleanupResult result);
+    Task SendTagBasedCleanupWebhookAsync(int itemCount);
+    Task SendErrorWebhookAsync(string errorType, string message);
+    Task SendHealthCheckWebhookAsync(object healthData);
 }
 
 public class WebhookService : IWebhookService
@@ -44,10 +52,10 @@ public class WebhookService : IWebhookService
 
         var payload = new WebhookPayload
         {
-            Event = eventType,
+            Event = eventType.ToString(),
             Timestamp = DateTime.UtcNow,
             CleanupType = cleanupType,
-            Items = items.Select(MapToWebhookMediaItem).ToList()
+            Items = items
         };
 
         await SendToEndpointsAsync(payload, eventType);
@@ -60,10 +68,10 @@ public class WebhookService : IWebhookService
 
         var payload = new WebhookPayload
         {
-            Event = WebhookEvent.CleanupStarted,
+            Event = WebhookEvent.CleanupStarted.ToString(),
             Timestamp = DateTime.UtcNow,
             CleanupType = cleanupType,
-            Items = new List<WebhookMediaItem>()
+            Items = new List<MediaItem>()
         };
 
         await SendToEndpointsAsync(payload, WebhookEvent.CleanupStarted);
@@ -76,10 +84,10 @@ public class WebhookService : IWebhookService
 
         var payload = new WebhookPayload
         {
-            Event = WebhookEvent.CleanupCompleted,
+            Event = WebhookEvent.CleanupCompleted.ToString(),
             Timestamp = DateTime.UtcNow,
             CleanupType = cleanupType,
-            Items = new List<WebhookMediaItem>(),
+            Items = new List<MediaItem>(),
             ItemsDeleted = itemsDeleted,
             SpaceFreed = spaceFreed
         };
@@ -94,16 +102,16 @@ public class WebhookService : IWebhookService
 
         var payload = new WebhookPayload
         {
-            Event = WebhookEvent.HealthCheck,
+            Event = WebhookEvent.HealthCheck.ToString(),
             Timestamp = DateTime.UtcNow,
             CleanupType = null,
-            Items = new List<WebhookMediaItem>()
+            Items = new List<MediaItem>()
         };
 
         await SendToEndpointsAsync(payload, WebhookEvent.HealthCheck);
     }
 
-    public async Task<List<WebhookEndpointStatus>> GetEndpointStatusAsync()
+    public Task<List<WebhookEndpointStatus>> GetEndpointStatusAsync()
     {
         var statuses = new List<WebhookEndpointStatus>();
 
@@ -114,7 +122,7 @@ public class WebhookService : IWebhookService
                 Name = endpoint.Name,
                 Url = endpoint.Url,
                 Enabled = endpoint.Enabled,
-                Events = endpoint.Events,
+                Events = endpoint.Events.Select(e => e.ToString()).ToList(),
                 CleanupTypes = endpoint.CleanupTypes,
                 LastTestResult = "Unknown"
             };
@@ -122,7 +130,7 @@ public class WebhookService : IWebhookService
             statuses.Add(status);
         }
 
-        return statuses;
+        return Task.FromResult(statuses);
     }
 
     public async Task TestEndpointAsync(string endpointName)
@@ -136,14 +144,74 @@ public class WebhookService : IWebhookService
 
         var testPayload = new WebhookPayload
         {
-            Event = WebhookEvent.HealthCheck,
+            Event = WebhookEvent.HealthCheck.ToString(),
             Timestamp = DateTime.UtcNow,
             CleanupType = null,
-            Items = new List<WebhookMediaItem>(),
+            Items = new List<MediaItem>(),
             TestMessage = "This is a test webhook from Janitor"
         };
 
         await SendToEndpointAsync(endpoint, testPayload);
+    }
+
+    // Add missing webhook methods for background service integration
+    public async Task SendCleanupWebhookAsync(CleanupResult result)
+    {
+        if (!_options.Enabled)
+            return;
+
+        var payload = new
+        {
+            Event = "cleanup_completed",
+            Timestamp = DateTime.UtcNow,
+            CleanupType = result.CleanupType.ToString(),
+            Duration = result.Duration.TotalMinutes,
+            ItemsFound = result.ItemsFound,
+            ItemsDeleted = result.ItemsDeleted,
+            Success = result.Success,
+            Error = result.Error
+        };
+
+        await SendToAllEndpointsAsync("cleanup_completed", payload);
+    }
+
+    public async Task SendTagBasedCleanupWebhookAsync(int itemCount)
+    {
+        if (!_options.Enabled)
+            return;
+
+        var payload = new
+        {
+            Event = "tag_based_cleanup",
+            Timestamp = DateTime.UtcNow,
+            ItemsProcessed = itemCount
+        };
+
+        await SendToAllEndpointsAsync("tag_based_cleanup", payload);
+    }
+
+    public async Task SendErrorWebhookAsync(string errorType, string message)
+    {
+        if (!_options.Enabled)
+            return;
+
+        var payload = new
+        {
+            Event = "error",
+            Timestamp = DateTime.UtcNow,
+            ErrorType = errorType,
+            Message = message
+        };
+
+        await SendToAllEndpointsAsync("error", payload);
+    }
+
+    public async Task SendHealthCheckWebhookAsync(object healthData)
+    {
+        if (!_options.Enabled)
+            return;
+
+        await SendToAllEndpointsAsync("health_check", healthData);
     }
 
     private async Task SendToEndpointsAsync(WebhookPayload payload, WebhookEvent eventType)
@@ -170,36 +238,18 @@ public class WebhookService : IWebhookService
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint.Url)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-
-            // Add authentication
-            AddAuthenticationToRequest(request, endpoint);
-
-            // Add custom headers
-            foreach (var header in endpoint.Headers)
-            {
-                request.Headers.Add(header.Key, header.Value);
-            }
-
             // Add HMAC signature if secret is provided
             if (!string.IsNullOrEmpty(endpoint.Secret))
             {
                 var signature = GenerateHmacSignature(json, endpoint.Secret);
-                request.Headers.Add("X-Janitor-Signature", signature);
+                payload = payload with { Signature = signature };
+                json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
             }
 
-            // Add identifying headers
-            request.Headers.Add("User-Agent", "Janitor-ASP/1.0");
-            request.Headers.Add("X-Janitor-Event", payload.Event.ToString());
-            if (payload.CleanupType.HasValue)
-            {
-                request.Headers.Add("X-Janitor-Cleanup-Type", payload.CleanupType.Value.ToString());
-            }
-
-            await SendWithRetryAsync(request, endpoint);
+            await SendWithRetryAsync(endpoint, json, 3);
         }
         catch (Exception ex)
         {
@@ -207,17 +257,22 @@ public class WebhookService : IWebhookService
         }
     }
 
-    private async Task SendWithRetryAsync(HttpRequestMessage request, WebhookEndpoint endpoint)
+    private string GenerateHmacSignature(string payload, string secret)
     {
-        var retryCount = 0;
-        var delays = new[] { 1000, 2000, 4000 }; // Exponential backoff
+        using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
+        var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(payload));
+        return Convert.ToBase64String(hash);
+    }
 
-        while (retryCount <= _options.RetryAttempts)
+    private async Task SendWithRetryAsync(WebhookEndpoint endpoint, string payload, int maxAttempts)
+    {
+        int attempt = 0;
+        while (attempt < maxAttempts)
         {
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-                using var response = await _httpClient.SendAsync(request, cts.Token);
+                using var response = await _httpClient.PostAsync(endpoint.Url, new StringContent(payload, Encoding.UTF8, "application/json"), cts.Token);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -231,18 +286,11 @@ public class WebhookService : IWebhookService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Webhook attempt {Attempt} failed to {Name} ({Url})", 
-                    retryCount + 1, endpoint.Name, endpoint.Url);
+                    attempt + 1, endpoint.Name, endpoint.Url);
             }
 
-            if (retryCount < _options.RetryAttempts)
-            {
-                await Task.Delay(delays[Math.Min(retryCount, delays.Length - 1)]);
-                retryCount++;
-            }
-            else
-            {
-                break;
-            }
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            attempt++;
         }
 
         _logger.LogError("All webhook attempts failed to {Name} ({Url})", endpoint.Name, endpoint.Url);
@@ -281,69 +329,32 @@ public class WebhookService : IWebhookService
         }
     }
 
-    private static string GenerateHmacSignature(string payload, string secret)
+    private async Task SendToAllEndpointsAsync(string eventType, object payload)
     {
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
-    private static WebhookMediaItem MapToWebhookMediaItem(MediaItem item)
-    {
-        return new WebhookMediaItem
+        var endpoints = GetEnabledEndpointsForEvent(eventType);
+        
+        foreach (var endpoint in endpoints)
         {
-            Id = item.Id,
-            Title = item.Title,
-            LibraryType = item.LibraryType,
-            ImdbId = item.ImdbId,
-            TmdbId = item.TmdbId,
-            ParentPath = item.ParentPath,
-            OriginalPath = item.OriginalPath,
-            Season = item.Season,
-            Tags = item.Tags,
-            ImportedDate = item.ImportedDate,
-            LastSeen = item.LastSeen,
-            HistoryAge = item.HistoryAge,
-            Seeding = item.Seeding
-        };
+            try
+            {
+                await SendWithRetryAsync(endpoint, JsonSerializer.Serialize(payload), 3);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send webhook to {Url}", endpoint.Url);
+            }
+        }
     }
-}
 
-public record WebhookPayload
-{
-    public WebhookEvent Event { get; init; }
-    public DateTime Timestamp { get; init; }
-    public CleanupType? CleanupType { get; init; }
-    public List<WebhookMediaItem> Items { get; init; } = new();
-    public int? ItemsDeleted { get; init; }
-    public long? SpaceFreed { get; init; }
-    public string? TestMessage { get; init; }
-}
-
-public record WebhookEndpointStatus
-{
-    public string Name { get; init; } = "";
-    public string Url { get; init; } = "";
-    public bool Enabled { get; init; }
-    public List<WebhookEvent> Events { get; init; } = new();
-    public List<CleanupType> CleanupTypes { get; init; } = new();
-    public string LastTestResult { get; init; } = "";
-    public DateTime? LastTestTime { get; init; }
-}
-
-public record WebhookMediaItem
-{
-    public int Id { get; init; }
-    public string Title { get; init; } = "";
-    public LibraryType LibraryType { get; init; }
-    public string? ImdbId { get; init; }
-    public int? TmdbId { get; init; }
-    public string ParentPath { get; init; } = "";
-    public string OriginalPath { get; init; } = "";
-    public int? Season { get; init; }
-    public List<string> Tags { get; init; } = new();
-    public DateTime? ImportedDate { get; init; }
-    public DateTime? LastSeen { get; init; }
-    public DateTime? HistoryAge { get; init; }
-    public bool Seeding { get; init; }
+    private List<WebhookEndpoint> GetEnabledEndpointsForEvent(string eventType)
+    {
+        if (Enum.TryParse<WebhookEvent>(eventType, out var webhookEvent))
+        {
+            return _options.Endpoints
+                .Where(e => e.Enabled && e.Events.Contains(webhookEvent))
+                .ToList();
+        }
+        
+        return new List<WebhookEndpoint>();
+    }
 }

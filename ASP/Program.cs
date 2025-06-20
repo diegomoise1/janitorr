@@ -2,8 +2,11 @@ using JanitorAspNet.Configuration;
 using JanitorAspNet.Clients;
 using JanitorAspNet.Services;
 using JanitorAspNet.Webhooks;
+using JanitorAspNet.HealthChecks;
+using JanitorAspNet.Middleware;
 using Refit;
 using Serilog;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +82,64 @@ builder.Services.AddRefitClient<ISonarrClient>()
         }
     });
 
+// Configure Jellyfin client
+builder.Services.AddRefitClient<IJellyfinClient>()
+    .ConfigureHttpClient((serviceProvider, httpClient) =>
+    {
+        var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApplicationOptions>>();
+        var jellyfin = options.Value.Jellyfin;
+        
+        if (jellyfin.Enabled && !string.IsNullOrEmpty(jellyfin.Url))
+        {
+            httpClient.BaseAddress = new Uri($"{jellyfin.Url}");
+            if (!string.IsNullOrEmpty(jellyfin.ApiKey))
+            {
+                httpClient.DefaultRequestHeaders.Add("X-Emby-Token", jellyfin.ApiKey);
+            }
+        }
+    });
+
+// Configure Bazarr client
+builder.Services.AddRefitClient<IBazarrClient>()
+    .ConfigureHttpClient((serviceProvider, httpClient) =>
+    {
+        var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApplicationOptions>>();
+        var bazarr = options.Value.Bazarr;
+        
+        if (bazarr.Enabled && !string.IsNullOrEmpty(bazarr.Url))
+        {
+            httpClient.BaseAddress = new Uri(bazarr.Url);
+            if (!string.IsNullOrEmpty(bazarr.ApiKey))
+            {
+                httpClient.DefaultRequestHeaders.Add("X-API-KEY", bazarr.ApiKey);
+            }
+        }
+    });
+
+// Configure memory cache and caching service
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ICacheService, MemoryCacheService>();
+
+// Configure background task queue
+builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
+builder.Services.AddHostedService<QueuedHostedService>();
+
+// Add application services
+builder.Services.AddScoped<ICleanupService, CleanupService>();
+builder.Services.AddScoped<IMediaServerService, JellyfinMediaServerService>();
+builder.Services.AddScoped<IFileSystemService, FileSystemService>();
+builder.Services.AddScoped<IStatsService, JellystatStatsService>();
+builder.Services.AddScoped<IJellyseerrService, JellyseerrService>();
+
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddCheck<RadarrHealthCheck>("radarr")
+    .AddCheck<SonarrHealthCheck>("sonarr")
+    .AddCheck<JellyfinHealthCheck>("jellyfin")
+    .AddCheck<JellyseerrHealthCheck>("jellyseerr")
+    .AddCheck<FileSystemHealthCheck>("filesystem")
+    .AddCheck<WebhookHealthCheck>("webhooks");
+
 // Configure webhook options and service
 builder.Services.Configure<WebhookOptions>(
     builder.Configuration.GetSection("Application:Webhooks"));
@@ -86,13 +147,13 @@ builder.Services.Configure<WebhookOptions>(
 builder.Services.AddHttpClient<IWebhookService, WebhookService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
 
-// Add application services
-builder.Services.AddScoped<ICleanupService, CleanupService>();
-
-// Add background service for scheduled cleanup
-builder.Services.AddHostedService<CleanupBackgroundService>();
+// Add exception handling middleware
+builder.Services.AddTransient<ExceptionHandlingMiddleware>();
 
 var app = builder.Build();
+
+// Use exception handling middleware
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -100,6 +161,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// Add health check endpoint
+app.MapHealthChecks("/health");
 
 app.UseHttpsRedirection();
 

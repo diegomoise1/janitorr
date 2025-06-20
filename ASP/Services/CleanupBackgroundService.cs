@@ -112,4 +112,28 @@ public class CleanupBackgroundService : BackgroundService
 
         return todayAtScheduledTime;
     }
+
+    private Task RunMediaCleanupAsync()
+    {
+        // TODO: Implement media cleanup logic
+        return Task.CompletedTask;
+    }
+
+    private Task RunTagBasedCleanupAsync()
+    {
+        // TODO: Implement tag-based cleanup logic
+        return Task.CompletedTask;
+    }
+
+    private Task RunEpisodeCleanupAsync()
+    {
+        // TODO: Implement episode cleanup logic
+        return Task.CompletedTask;
+    }
+
+    private Task SendHealthCheckWebhooksAsync()
+    {
+        // TODO: Implement health check webhook logic
+        return Task.CompletedTask;
+    }
 }

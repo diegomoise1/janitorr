@@ -43,8 +43,26 @@ public interface IRadarrClient
     [Delete("/movie/{id}")]
     Task DeleteMovieAsync(int id, [Query] bool deleteFiles = false, [Query] bool addImportExclusion = false);
 
+    [Get("/qualityprofile")]
+    Task<List<RadarrQualityProfile>> GetQualityProfilesAsync();
+
+    [Get("/rootfolder")]
+    Task<List<RadarrRootFolder>> GetRootFoldersAsync();
+
+    [Get("/moviefile/{id}")]
+    Task<RadarrMovieFile> GetMovieFileAsync(int id);
+
+    [Post("/movie/{id}/monitor")]
+    Task SetMovieMonitoredAsync(int id, [Body] bool monitored);
+
+    [Delete("/moviefile/{id}")]
+    Task DeleteMovieFileAsync(int id);
+
     [Get("/history")]
-    Task<RadarrPage<RadarrHistory>> GetHistoryAsync([Query] int page = 1, [Query] int pageSize = 20);
+    Task<RadarrPage<RadarrHistory>> GetHistoryAsync([Query] int page = 1, [Query] int pageSize = 20, [Query] string? eventType = null);
+
+    [Get("/customformat")]
+    Task<List<RadarrCustomFormat>> GetCustomFormatsAsync();
 
     [Get("/tag")]
     Task<List<RadarrTag>> GetTagsAsync();
@@ -71,8 +89,23 @@ public interface ISonarrClient
     [Get("/episode")]
     Task<List<SonarrEpisode>> GetEpisodesAsync([Query] int? seriesId = null);
 
+    [Get("/qualityprofile")]
+    Task<List<SonarrQualityProfile>> GetQualityProfilesAsync();
+
+    [Get("/rootfolder")]
+    Task<List<SonarrRootFolder>> GetRootFoldersAsync();
+
+    [Get("/episodefile/{id}")]
+    Task<SonarrEpisodeFile> GetEpisodeFileAsync(int id);
+
+    [Post("/series/{id}/monitor")]
+    Task SetSeriesMonitoredAsync(int id, [Body] bool monitored);
+
+    [Delete("/episodefile/{id}")]
+    Task DeleteEpisodeFileAsync(int id);
+
     [Get("/history")]
-    Task<SonarrPage<SonarrHistory>> GetHistoryAsync([Query] int page = 1, [Query] int pageSize = 20);
+    Task<SonarrPage<SonarrHistory>> GetHistoryAsync([Query] int page = 1, [Query] int pageSize = 20, [Query] string? eventType = null);
 
     [Get("/tag")]
     Task<List<SonarrTag>> GetTagsAsync();
@@ -166,4 +199,48 @@ public record SonarrPage<T>
     public int Page { get; init; }
     public int PageSize { get; init; }
     public int TotalRecords { get; init; }
+}
+
+public record RadarrQualityProfile
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+}
+
+public record RadarrRootFolder
+{
+    public string Path { get; init; } = "";
+    public long FreeSpace { get; init; }
+}
+
+public record RadarrMovieFile
+{
+    public int Id { get; init; }
+    public string RelativePath { get; init; } = "";
+    public long Size { get; init; }
+}
+
+public record RadarrCustomFormat
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+}
+
+public record SonarrQualityProfile
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+}
+
+public record SonarrRootFolder
+{
+    public string Path { get; init; } = "";
+    public long FreeSpace { get; init; }
+}
+
+public record SonarrEpisodeFile
+{
+    public int Id { get; init; }
+    public string RelativePath { get; init; } = "";
+    public long Size { get; init; }
 }

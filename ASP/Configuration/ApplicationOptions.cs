@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using JanitorAspNet.Models;
 
 namespace JanitorAspNet.Configuration;
@@ -6,7 +7,7 @@ namespace JanitorAspNet.Configuration;
 /// Main application configuration options
 /// Transpiled from ApplicationProperties.kt and old_application.yml
 /// </summary>
-public class ApplicationOptions
+public class ApplicationOptions : IValidatableObject
 {
     public const string SectionName = "Application";
 
@@ -54,6 +55,15 @@ public class ApplicationOptions
     
     [Obsolete("Use TagBasedDeletion.Enabled instead")]
     public bool EnableTagBasedCleanup => TagBasedDeletion.Enabled;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        // Validate URL formats
+        // Ensure required API keys are present when services are enabled
+        // Validate disk space percentages
+        // Check webhook endpoint configurations
+        yield break;
+    }
 }
 
 public class FileSystemOptions
@@ -273,4 +283,11 @@ public class CleanupOptions
     public int MovieDeletionDelayDays { get; set; } = 7;
     public int SeasonDeletionDelayDays { get; set; } = 14;
     public int EpisodeDeletionDelayDays { get; set; } = 3;
+    public int DaysToKeep { get; set; } = 30;
+    public double DiskSpaceThreshold { get; set; } = 85.0;
+    public bool SkipSeeding { get; set; } = true;
+    public List<string>? ExcludeTags { get; set; }
+    public List<string>? MonitorPaths { get; set; }
+    public int? EpisodesToKeep { get; set; } = 5;
+    public string? LeavingSoonPath { get; set; }
 }

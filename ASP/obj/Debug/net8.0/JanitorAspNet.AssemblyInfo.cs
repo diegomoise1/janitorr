@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("JanitorAspNet")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+abfba5f60a44f7258f35b43e28d6487fd46b6868")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9279d5120d1a7ddfc0a55e5c05c0ca31aa708d57")]
 [assembly: System.Reflection.AssemblyProductAttribute("JanitorAspNet")]
 [assembly: System.Reflection.AssemblyTitleAttribute("JanitorAspNet")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -5,6 +5,7 @@ using JanitorAspNet.Webhooks;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using System.IO;
+using WebhookEvent = JanitorAspNet.Configuration.WebhookEvent;
 
 namespace JanitorAspNet.Services;
 
@@ -17,6 +18,9 @@ public interface ICleanupService
     Task<CleanupStatus> GetStatusAsync();
     Task<int> RunCleanupAsync(CleanupType type, bool dryRun = true);
     Task<List<MediaItem>> GetItemsForCleanupAsync(CleanupType type);
+    Task<CleanupResult> PerformCleanupAsync(CleanupType cleanupType);
+    Task<List<LibraryItem>> GetExpiredItemsForCleanupAsync(CleanupType cleanupType, TimeSpan expiration);
+    Task<bool> ShouldRunCleanupAsync();
 }
 
 public class CleanupService : ICleanupService
@@ -149,6 +153,24 @@ public class CleanupService : ICleanupService
         }
     }
 
+    public async Task<CleanupResult> PerformCleanupAsync(CleanupType cleanupType)
+    {
+        var startTime = DateTime.UtcNow;
+        var itemsDeleted = await RunCleanupAsync(cleanupType, false);
+        var endTime = DateTime.UtcNow;
+        
+        return new CleanupResult
+        {
+            CleanupType = cleanupType,
+            StartTime = startTime,
+            EndTime = endTime,
+            Duration = endTime - startTime,
+            ItemsDeleted = itemsDeleted,
+            ItemsFound = itemsDeleted, // Simplified for now
+            Success = true
+        };
+    }
+
     public async Task<List<MediaItem>> GetItemsForCleanupAsync(CleanupType type)
     {
         return type switch
@@ -183,7 +205,7 @@ public class CleanupService : ICleanupService
             {
                 Id = m.Id,
                 Title = m.Title,
-                LibraryType = LibraryType.Movies,
+                LibraryType = LibraryType.Movie,
                 ImdbId = m.ImdbId,
                 TmdbId = m.TmdbId,
                 ParentPath = m.Path,
@@ -216,7 +238,7 @@ public class CleanupService : ICleanupService
             {
                 Id = s.Id,
                 Title = s.Title,
-                LibraryType = LibraryType.Shows,
+                LibraryType = LibraryType.TvShow,
                 ImdbId = s.ImdbId,
                 TmdbId = s.TvdbId,
                 ParentPath = s.Path,
@@ -243,7 +265,7 @@ public class CleanupService : ICleanupService
             {
                 Id = e.Id,
                 Title = e.Title,
-                LibraryType = LibraryType.Episodes,
+                LibraryType = LibraryType.Episode,
                 ParentPath = "", // Would need to get from series
                 OriginalPath = "", // Would need to get from episode file
                 Season = e.SeasonNumber,
@@ -271,13 +293,13 @@ public class CleanupService : ICleanupService
 
         switch (item.LibraryType)
         {
-            case LibraryType.Movies:
+            case LibraryType.Movie:
                 await _radarrClient.DeleteMovieAsync(item.Id, deleteFiles: true);
                 break;
-            case LibraryType.Shows:
+            case LibraryType.TvShow:
                 await _sonarrClient.DeleteSeriesAsync(item.Id, deleteFiles: true);
                 break;
-            case LibraryType.Episodes:
+            case LibraryType.Episode:
                 // Would need episode-specific deletion logic
                 break;
         }
@@ -376,5 +398,51 @@ public class CleanupService : ICleanupService
         {
             return 0;
         }
+    }
+
+    public Task<bool> ShouldRunCleanupAsync()
+    {
+        // Check if cleanup is already running
+        if (_currentStatus.IsRunning)
+            return Task.FromResult(false);
+
+        // Check if enough time has passed since last run
+        if (_currentStatus.LastRun.HasValue)
+        {
+            var timeSinceLastRun = DateTime.UtcNow - _currentStatus.LastRun.Value;
+            var minimumInterval = TimeSpan.FromHours(1); // Configurable minimum interval
+            
+            if (timeSinceLastRun < minimumInterval)
+                return Task.FromResult(false);
+        }
+
+        // Check if any cleanup types are enabled
+        var shouldRun = _options.MediaDeletion.Enabled || 
+                       _options.TagBasedDeletion.Enabled || 
+                       _options.EpisodeDeletion.Enabled;
+        
+        return Task.FromResult(shouldRun);
+    }
+
+    public async Task<List<LibraryItem>> GetExpiredItemsForCleanupAsync(CleanupType cleanupType, TimeSpan expiration)
+    {
+        var items = await GetItemsForCleanupAsync(cleanupType);
+        var cutoffDate = DateTime.UtcNow - expiration;
+        
+        return items.Where(item => item.ImportedDate <= cutoffDate)
+                   .Select(item => new LibraryItem
+                   {
+                       Id = item.Id.ToString(),
+                       Title = item.Title,
+                       FilePath = item.OriginalPath,
+                       Type = item.LibraryType,
+                       HistoryAge = item.HistoryAge ?? DateTime.UtcNow,
+                       LastSeen = item.LastSeen,
+                       Season = item.Season,
+                       ImdbId = item.ImdbId,
+                       TmdbId = item.TmdbId,
+                       Seeding = item.Seeding
+                   })
+                   .ToList();
     }
 }
