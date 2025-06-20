@@ -147,9 +147,6 @@ builder.Services.Configure<WebhookOptions>(
 builder.Services.AddHttpClient<IWebhookService, WebhookService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
 
-// Add exception handling middleware
-builder.Services.AddTransient<ExceptionHandlingMiddleware>();
-
 var app = builder.Build();
 
 // Use exception handling middleware
