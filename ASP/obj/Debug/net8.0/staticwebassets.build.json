@@ -1,0 +1,39 @@
+{
+  "Version": 1,
+  "Hash": "CySq5q2QEygogafRg+/Zldpg3BzBO+2EbH9s7SOiQpI=",
+  "Source": "JanitorAspNet",
+  "BasePath": "_content/JanitorAspNet",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "JanitorAspNet/wwwroot",
+      "Source": "JanitorAspNet",
+      "ContentRoot": "/workspaces/janitorr/ASP/wwwroot/",
+      "BasePath": "_content/JanitorAspNet",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "/workspaces/janitorr/ASP/wwwroot/index.html",
+      "SourceId": "JanitorAspNet",
+      "SourceType": "Discovered",
+      "ContentRoot": "/workspaces/janitorr/ASP/wwwroot/",
+      "BasePath": "_content/JanitorAspNet",
+      "RelativePath": "index.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/index.html"
+    }
+  ]
+}

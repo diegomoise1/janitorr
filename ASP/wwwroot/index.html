@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Janitor ASP.NET - Status Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-running {
+            background-color: #48bb78;
+        }
+
+        .status-idle {
+            background-color: #4299e1;
+        }
+
+        .status-error {
+            background-color: #f56565;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+        }
+
+        .metric:last-child {
+            margin-bottom: 0;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .cleanup-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .cleanup-running {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+        }
+
+        .cleanup-idle {
+            background-color: #c6f6d5;
+            color: #276749;
+        }
+
+        .btn {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background: #3182ce;
+        }
+
+        .btn-success {
+            background: #48bb78;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+        }
+
+        .btn-danger {
+            background: #f56565;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .btn-primary {
+            background: #4c6ef5;
+        }
+
+        .btn-primary:hover {
+            background: #3b5bdb;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #e2e8f0;
+            margin: 10px 0;
+        }
+
+        .test-mode-controls {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-container input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.2);
+        }
+
+        .toggle-label {
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .alert-success {
+            background-color: #c6f6d5;
+            color: #276749;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-error {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+            border: 1px solid #fbb6ce;
+        }
+
+        .alert-warning {
+            background-color: #feebc8;
+            color: #744210;
+            border: 1px solid #f6e05e;
+        }
+
+        .alert-info {
+            background-color: #ebf8ff;
+            border-color: #bee3f8;
+            color: #2a69ac;
+        }
+
+        .config-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        .config-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: #4a5568;
+            margin-bottom: 5px;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .logs-container {
+            background: #1a202c;
+            color: #e2e8f0;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #4a5568;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .config-form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span id="statusIndicator" class="status-indicator status-idle"></span>
+                Janitor ASP.NET Dashboard
+            </h1>
+            <p id="currentTime">Loading...</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>System Status</h3>
+                <div id="systemStatus" class="loading">Loading system status...</div>
+            </div>
+
+            <div class="card">
+                <h3>Cleanup Status</h3>
+                <div id="cleanupStatus" class="loading">Loading cleanup status...</div>
+            </div>
+
+            <div class="card">
+                <h3>Configuration Summary</h3>
+                <div id="configSummary" class="loading">Loading configuration...</div>
+            </div>
+
+            <div class="card">
+                <h3>System Information</h3>
+                <div id="systemInfo" class="loading">Loading system info...</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <button class="btn btn-primary" onclick="runAllCleanup(true)">🔍 Preview All Cleanup</button>
+            <button class="btn btn-danger" onclick="runAllCleanup(false)">🗑️ Run All Cleanup</button>
+            <hr>
+            <button class="btn btn-success" onclick="runCleanup('Movie', true)">Preview Movie Cleanup</button>
+            <button class="btn btn-success" onclick="runCleanup('Season', true)">Preview Season Cleanup</button>
+            <button class="btn btn-success" onclick="runCleanup('WeeklyEpisode', true)">Preview Episode Cleanup</button>
+            <hr>
+            <button class="btn" onclick="refreshStatus()">Refresh Status</button>
+            <button class="btn" onclick="toggleConfigSection()">Toggle Configuration</button>
+        </div>
+
+        <div id="configSection" class="config-section" style="display: none;">
+            <h3>Configuration Management</h3>
+            
+            <!-- Test Mode Toggle -->
+            <div class="test-mode-controls">
+                <label class="toggle-container">
+                    <input type="checkbox" id="testModeToggle" onchange="toggleTestMode()">
+                    <span class="toggle-label">🧪 Test Mode - Make temporary changes without saving</span>
+                </label>
+            </div>
+            
+            <div id="configModeIndicator" class="alert alert-info" style="display: none;">
+                <strong>🧪 Test Mode Active:</strong> Changes are temporary and will be reset when you reload the page or disable test mode. Use "Apply Changes" to test functionality.
+            </div>
+            
+            <div class="alert alert-warning">
+                <strong>Warning:</strong> Configuration changes require an application restart to take effect.
+            </div>
+            
+            <div id="configForm" class="loading">Loading configuration form...</div>
+            
+            <div style="margin-top: 20px;">
+                <div id="normalModeButtons">
+                    <button class="btn btn-success" onclick="saveConfiguration()">💾 Save Configuration</button>
+                    <button class="btn" onclick="loadConfiguration()">🔄 Reload Configuration</button>
+                </div>
+                <div id="testModeButtons" style="display: none;">
+                    <button class="btn btn-primary" onclick="applyTestConfiguration()">🧪 Apply Changes (Test)</button>
+                    <button class="btn btn-success" onclick="saveTestConfiguration()">💾 Save Changes Permanently</button>
+                    <button class="btn btn-warning" onclick="resetTestConfiguration()">↩️ Reset to Saved</button>
+                    <button class="btn" onclick="loadConfiguration()">🔄 Reload Original</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Logs</h3>
+            <button class="btn" onclick="refreshLogs()">Refresh Logs</button>
+            <div id="logsContainer" class="logs-container">Loading logs...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = null;
+        let originalConfig = null; // Store the original configuration for test mode
+        let testMode = false;
+        let statusUpdateInterval = null;
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            refreshLogs();
+            updateCurrentTime();
+            
+            // Update time every second
+            setInterval(updateCurrentTime, 1000);
+            
+            // Auto-refresh status every 30 seconds
+            statusUpdateInterval = setInterval(refreshStatus, 30000);
+        });
+
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                `Current Time: ${now.toLocaleString()}`;
+        }
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                updateSystemStatus(data);
+                updateCleanupStatus(data.cleanup);
+                updateConfigSummary(data.configuration);
+                updateSystemInfo(data.systemInfo);
+                updateStatusIndicator(data.cleanup.isRunning);
+                
+            } catch (error) {
+                console.error('Failed to refresh status:', error);
+                showAlert('Failed to refresh status', 'error');
+            }
+        }
+
+        function updateSystemStatus(data) {
+            const container = document.getElementById('systemStatus');
+            container.innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Application:</span>
+                    <span class="metric-value">${data.applicationName}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Version:</span>
+                    <span class="metric-value">${data.version}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Environment:</span>
+                    <span class="metric-value">${data.environment}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Startup Time:</span>
+                    <span class="metric-value">${new Date(data.startupTime).toLocaleString()}</span>
+                </div>
+            `;
+        }
+
+        function updateCleanupStatus(cleanup) {
+            const container = document.getElementById('cleanupStatus');
+            const statusClass = cleanup.isRunning ? 'cleanup-running' : 'cleanup-idle';
+            const statusText = cleanup.isRunning ? 'Running' : 'Idle';
+            
+            container.innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Status:</span>
+                    <span class="cleanup-status ${statusClass}">${statusText}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Last Run:</span>
+                    <span class="metric-value">${cleanup.lastRun ? new Date(cleanup.lastRun).toLocaleString() : 'Never'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Items Deleted:</span>
+                    <span class="metric-value">${cleanup.itemsDeleted}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Space Freed:</span>
+                    <span class="metric-value">${formatBytes(cleanup.spaceFreed)}</span>
+                </div>
+            `;
+        }
+
+        function updateConfigSummary(config) {
+            const container = document.getElementById('configSummary');
+            container.innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Dry Run Mode:</span>
+                    <span class="metric-value">${config.dryRun ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Jellyseerr:</span>
+                    <span class="metric-value">${config.jellyseerrConfigured ? 'Configured' : 'Not Configured'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Radarr:</span>
+                    <span class="metric-value">${config.radarrConfigured ? 'Configured' : 'Not Configured'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Sonarr:</span>
+                    <span class="metric-value">${config.sonarrConfigured ? 'Configured' : 'Not Configured'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Jellyfin:</span>
+                    <span class="metric-value">${config.jellyfinConfigured ? 'Configured' : 'Not Configured'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Jellystat:</span>
+                    <span class="metric-value">${config.jellystatConfigured ? 'Configured' : 'Not Configured'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">File System Access:</span>
+                    <span class="metric-value">${config.cleanupTypesEnabled.fileSystemAccess ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Media Deletion:</span>
+                    <span class="metric-value">${config.cleanupTypesEnabled.mediaDeletion ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Tag-Based Deletion:</span>
+                    <span class="metric-value">${config.cleanupTypesEnabled.tagBasedDeletion ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Episode Deletion:</span>
+                    <span class="metric-value">${config.cleanupTypesEnabled.episodeDeletion ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Webhooks:</span>
+                    <span class="metric-value">${config.webhooksEnabled ? `Enabled (${config.webhookEndpointCount} endpoints)` : 'Disabled'}</span>
+                </div>
+            `;
+        }
+
+        function updateSystemInfo(systemInfo) {
+            const container = document.getElementById('systemInfo');
+            container.innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Machine:</span>
+                    <span class="metric-value">${systemInfo.machineName}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">OS:</span>
+                    <span class="metric-value">${systemInfo.operatingSystem}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">CPU Cores:</span>
+                    <span class="metric-value">${systemInfo.processorCount}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Memory Usage:</span>
+                    <span class="metric-value">${formatBytes(systemInfo.workingSet)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">64-bit Process:</span>
+                    <span class="metric-value">${systemInfo.is64BitProcess ? 'Yes' : 'No'}</span>
+                </div>
+            `;
+        }
+
+        function updateStatusIndicator(isRunning) {
+            const indicator = document.getElementById('statusIndicator');
+            indicator.className = `status-indicator ${isRunning ? 'status-running' : 'status-idle'}`;
+        }
+
+        async function refreshLogs() {
+            try {
+                const response = await fetch('/api/status/logs');
+                const logs = await response.json();
+                
+                const container = document.getElementById('logsContainer');
+                container.innerHTML = logs.join('\n');
+                container.scrollTop = container.scrollHeight;
+                
+            } catch (error) {
+                console.error('Failed to refresh logs:', error);
+                document.getElementById('logsContainer').innerHTML = 'Failed to load logs';
+            }
+        }
+
+        async function loadConfiguration() {
+            try {
+                const response = await fetch('/api/status/config');
+                const config = await response.json();
+                
+                // Store original config for test mode
+                originalConfig = JSON.parse(JSON.stringify(config));
+                currentConfig = JSON.parse(JSON.stringify(config));
+                
+                renderConfigurationForm(currentConfig);
+                
+            } catch (error) {
+                console.error('Failed to load configuration:', error);
+                showAlert('Failed to load configuration', 'error');
+            }
+        }
+
+        function toggleTestMode() {
+            testMode = document.getElementById('testModeToggle').checked;
+            
+            const indicator = document.getElementById('configModeIndicator');
+            const normalButtons = document.getElementById('normalModeButtons');
+            const testButtons = document.getElementById('testModeButtons');
+            
+            if (testMode) {
+                indicator.style.display = 'block';
+                normalButtons.style.display = 'none';
+                testButtons.style.display = 'block';
+                showAlert('🧪 Test mode enabled. Changes will be temporary until saved.', 'info');
+            } else {
+                indicator.style.display = 'none';
+                normalButtons.style.display = 'block';
+                testButtons.style.display = 'none';
+                
+                // Reset to original config if in test mode
+                if (currentConfig && originalConfig) {
+                    currentConfig = JSON.parse(JSON.stringify(originalConfig));
+                    renderConfigurationForm(currentConfig);
+                }
+                showAlert('Test mode disabled. Configuration reset to saved values.', 'info');
+            }
+        }
+
+        async function applyTestConfiguration() {
+            if (!testMode) {
+                showAlert('Not in test mode', 'error');
+                return;
+            }
+
+            try {
+                // Collect current form values
+                collectConfigurationFromForm();
+                
+                showAlert('🧪 Test configuration applied temporarily. This does not affect the saved configuration.', 'success');
+                
+            } catch (error) {
+                console.error('Failed to apply test configuration:', error);
+                showAlert('Failed to apply test configuration', 'error');
+            }
+        }
+
+        async function saveTestConfiguration() {
+            if (!testMode) {
+                showAlert('Not in test mode', 'error');
+                return;
+            }
+
+            const confirmSave = confirm('Are you sure you want to save these test changes permanently? This will overwrite the current configuration.');
+            if (!confirmSave) return;
+
+            try {
+                // Collect current form values
+                collectConfigurationFromForm();
+                
+                // Save the configuration
+                await saveConfigurationInternal();
+                
+                // Update original config to match saved config
+                originalConfig = JSON.parse(JSON.stringify(currentConfig));
+                
+                showAlert('💾 Test configuration saved permanently!', 'success');
+                
+            } catch (error) {
+                console.error('Failed to save test configuration:', error);
+                showAlert('Failed to save test configuration', 'error');
+            }
+        }
+
+        function resetTestConfiguration() {
+            if (!testMode) {
+                showAlert('Not in test mode', 'error');
+                return;
+            }
+
+            if (originalConfig) {
+                currentConfig = JSON.parse(JSON.stringify(originalConfig));
+                renderConfigurationForm(currentConfig);
+                showAlert('↩️ Configuration reset to saved values', 'info');
+            }
+        }
+
+        function collectConfigurationFromForm() {
+            if (!currentConfig) return;
+
+            // Core Application Settings
+            currentConfig.dryRun = document.getElementById('dryRun').checked;
+            currentConfig.runOnce = document.getElementById('runOnce').checked;
+            currentConfig.wholeTvShow = document.getElementById('wholeTvShow').checked;
+            currentConfig.wholeShowSeedingCheck = document.getElementById('wholeShowSeedingCheck').checked;
+            currentConfig.leavingSoon = document.getElementById('leavingSoon').value;
+            currentConfig.exclusionTag = document.getElementById('exclusionTag').value;
+
+            // Scheduling Settings
+            currentConfig.scheduling = currentConfig.scheduling || {};
+            currentConfig.scheduling.enabled = document.getElementById('schedulingEnabled').checked;
+            currentConfig.scheduling.dailyRunTime = document.getElementById('dailyRunTime').value;
+            currentConfig.scheduling.runOnStartup = document.getElementById('runOnStartup').checked;
+
+            // File System Settings
+            currentConfig.fileSystem = currentConfig.fileSystem || {};
+            currentConfig.fileSystem.access = document.getElementById('fileSystemAccess').checked;
+            currentConfig.fileSystem.validateSeeding = document.getElementById('validateSeeding').checked;
+            currentConfig.fileSystem.leavingSoonDir = document.getElementById('leavingSoonDir').value;
+            currentConfig.fileSystem.freeSpaceCheckDir = document.getElementById('freeSpaceCheckDir').value;
+
+            // Jellyseerr Settings
+            currentConfig.jellyseerr = currentConfig.jellyseerr || {};
+            currentConfig.jellyseerr.enabled = document.getElementById('jellyseerrEnabled').checked;
+            currentConfig.jellyseerr.url = document.getElementById('jellyseerrUrl').value;
+            currentConfig.jellyseerr.apiKey = document.getElementById('jellyseerrApiKey').value;
+            currentConfig.jellyseerr.matchServer = document.getElementById('jellyseerrMatchServer').checked;
+
+            // Jellyfin Settings
+            currentConfig.jellyfin = currentConfig.jellyfin || {};
+            currentConfig.jellyfin.enabled = document.getElementById('jellyfinEnabled').checked;
+            currentConfig.jellyfin.url = document.getElementById('jellyfinUrl').value;
+            currentConfig.jellyfin.apiKey = document.getElementById('jellyfinApiKey').value;
+            currentConfig.jellyfin.username = document.getElementById('jellyfinUsername').value;
+            currentConfig.jellyfin.password = document.getElementById('jellyfinPassword').value;
+            currentConfig.jellyfin.delete = document.getElementById('jellyfinDelete').checked;
+
+            // Radarr Settings
+            currentConfig.radarr = currentConfig.radarr || {};
+            currentConfig.radarr.enabled = document.getElementById('radarrEnabled').checked;
+            currentConfig.radarr.url = document.getElementById('radarrUrl').value;
+            currentConfig.radarr.apiKey = document.getElementById('radarrApiKey').value;
+            currentConfig.radarr.onlyDeleteFiles = document.getElementById('radarrOnlyDeleteFiles').checked;
+            currentConfig.radarr.determineAgeBy = document.getElementById('radarrDetermineAgeBy').value;
+
+            // Sonarr Settings
+            currentConfig.sonarr = currentConfig.sonarr || {};
+            currentConfig.sonarr.enabled = document.getElementById('sonarrEnabled').checked;
+            currentConfig.sonarr.url = document.getElementById('sonarrUrl').value;
+            currentConfig.sonarr.apiKey = document.getElementById('sonarrApiKey').value;
+            currentConfig.sonarr.onlyDeleteFiles = document.getElementById('sonarrOnlyDeleteFiles').checked;
+            currentConfig.sonarr.determineAgeBy = document.getElementById('sonarrDetermineAgeBy').value;
+
+            // Webhook Settings
+            currentConfig.webhooks = currentConfig.webhooks || {};
+            currentConfig.webhooks.enabled = document.getElementById('webhooksEnabled').checked;
+            currentConfig.webhooks.retryAttempts = parseInt(document.getElementById('webhookRetryAttempts').value);
+            currentConfig.webhooks.timeoutSeconds = parseInt(document.getElementById('webhookTimeoutSeconds').value);
+
+            // Jellystat Settings
+            currentConfig.jellystat = currentConfig.jellystat || {};
+            currentConfig.jellystat.enabled = document.getElementById('jellystatEnabled')?.checked || false;
+            currentConfig.jellystat.url = document.getElementById('jellystatUrl')?.value || '';
+            currentConfig.jellystat.apiKey = document.getElementById('jellystatApiKey')?.value || '';
+            currentConfig.jellystat.wholeTvShow = document.getElementById('jellystatWholeTvShow')?.checked || false;
+
+            // Media Deletion Settings
+            currentConfig.mediaDeletion = currentConfig.mediaDeletion || {};
+            currentConfig.mediaDeletion.enabled = document.getElementById('mediaDeletionEnabled')?.checked || false;
+
+            // Tag-Based Deletion Settings
+            currentConfig.tagBasedDeletion = currentConfig.tagBasedDeletion || {};
+            currentConfig.tagBasedDeletion.enabled = document.getElementById('tagBasedDeletionEnabled')?.checked || false;
+            currentConfig.tagBasedDeletion.minimumFreeDiskPercent = parseInt(document.getElementById('minimumFreeDiskPercent')?.value || '80');
+
+            // Episode Deletion Settings
+            currentConfig.episodeDeletion = currentConfig.episodeDeletion || {};
+            currentConfig.episodeDeletion.enabled = document.getElementById('episodeDeletionEnabled')?.checked || false;
+            currentConfig.episodeDeletion.tag = document.getElementById('episodeDeletionTag')?.value || '';
+            currentConfig.episodeDeletion.maxEpisodes = parseInt(document.getElementById('maxEpisodes')?.value || '10');
+            currentConfig.episodeDeletion.maxAge = document.getElementById('maxAge')?.value || '30d';
+        }
+
+        function renderConfigurationForm(config) {
+            const container = document.getElementById('configForm');
+            container.innerHTML = `
+                <div class="config-form">
+                    <!-- Core Application Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">Core Application Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="dryRun" ${config.dryRun ? 'checked' : ''}> 
+                            Dry Run Mode
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="runOnce" ${config.runOnce ? 'checked' : ''}> 
+                            Run Once and Exit
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="wholeTvShow" ${config.wholeTvShow ? 'checked' : ''}> 
+                            Whole TV Show Mode
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="wholeShowSeedingCheck" ${config.wholeShowSeedingCheck ? 'checked' : ''}> 
+                            Whole Show Seeding Check
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="leavingSoon">Leaving Soon Duration:</label>
+                        <input type="text" id="leavingSoon" value="${config.leavingSoon || '14d'}" placeholder="14d">
+                    </div>
+                    <div class="form-group">
+                        <label for="exclusionTag">Exclusion Tag:</label>
+                        <input type="text" id="exclusionTag" value="${config.exclusionTag || 'janitorr_keep'}" placeholder="janitorr_keep">
+                    </div>
+
+                    <!-- Scheduling Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Scheduling Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="schedulingEnabled" ${config.scheduling?.enabled ? 'checked' : ''}> 
+                            Enable Scheduled Cleanup
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="dailyRunTime">Daily Run Time (24h format):</label>
+                        <input type="time" id="dailyRunTime" value="${config.scheduling?.dailyRunTime || '02:00'}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="runOnStartup" ${config.scheduling?.runOnStartup ? 'checked' : ''}> 
+                            Run on Application Startup
+                        </label>
+                    </div>
+
+                    <!-- File System Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">File System Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="fileSystemAccess" ${config.fileSystem?.access ? 'checked' : ''}> 
+                            File System Access
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="validateSeeding" ${config.fileSystem?.validateSeeding ? 'checked' : ''}> 
+                            Validate Seeding
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="leavingSoonDir">Leaving Soon Directory:</label>
+                        <input type="text" id="leavingSoonDir" value="${config.fileSystem?.leavingSoonDir || '/data/media/leaving-soon'}">
+                    </div>
+                    <div class="form-group">
+                        <label for="freeSpaceCheckDir">Free Space Check Directory:</label>
+                        <input type="text" id="freeSpaceCheckDir" value="${config.fileSystem?.freeSpaceCheckDir || '/'}">
+                    </div>
+
+                    <!-- Jellyseerr Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Jellyseerr Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellyseerrEnabled" ${config.jellyseerr?.enabled ? 'checked' : ''}> 
+                            Enable Jellyseerr
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyseerrUrl">Jellyseerr URL:</label>
+                        <input type="text" id="jellyseerrUrl" value="${config.jellyseerr?.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyseerrApiKey">Jellyseerr API Key:</label>
+                        <input type="password" id="jellyseerrApiKey" value="${config.jellyseerr?.apiKey || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellyseerrMatchServer" ${config.jellyseerr?.matchServer ? 'checked' : ''}> 
+                            Match Server
+                        </label>
+                    </div>
+
+                    <!-- Jellyfin Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Jellyfin Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellyfinEnabled" ${config.jellyfin?.enabled ? 'checked' : ''}> 
+                            Enable Jellyfin
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyfinUrl">Jellyfin URL:</label>
+                        <input type="text" id="jellyfinUrl" value="${config.jellyfin?.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyfinApiKey">Jellyfin API Key:</label>
+                        <input type="password" id="jellyfinApiKey" value="${config.jellyfin?.apiKey || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyfinUsername">Jellyfin Username:</label>
+                        <input type="text" id="jellyfinUsername" value="${config.jellyfin?.username || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="jellyfinPassword">Jellyfin Password:</label>
+                        <input type="password" id="jellyfinPassword" value="${config.jellyfin?.password || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellyfinDelete" ${config.jellyfin?.delete ? 'checked' : ''}> 
+                            Enable Jellyfin Deletion
+                        </label>
+                    </div>
+
+                    <!-- Radarr Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Radarr Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="radarrEnabled" ${config.radarr?.enabled ? 'checked' : ''}> 
+                            Enable Radarr
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="radarrUrl">Radarr URL:</label>
+                        <input type="text" id="radarrUrl" value="${config.radarr?.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="radarrApiKey">Radarr API Key:</label>
+                        <input type="password" id="radarrApiKey" value="${config.radarr?.apiKey || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="radarrOnlyDeleteFiles" ${config.radarr?.onlyDeleteFiles ? 'checked' : ''}> 
+                            Only Delete Files (Keep Radarr Entry)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="radarrDetermineAgeBy">Determine Age By:</label>
+                        <select id="radarrDetermineAgeBy">
+                            <option value="MostRecent" ${config.radarr?.determineAgeBy === 'MostRecent' ? 'selected' : ''}>Most Recent</option>
+                            <option value="Oldest" ${config.radarr?.determineAgeBy === 'Oldest' ? 'selected' : ''}>Oldest</option>
+                        </select>
+                    </div>
+
+                    <!-- Sonarr Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Sonarr Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="sonarrEnabled" ${config.sonarr?.enabled ? 'checked' : ''}> 
+                            Enable Sonarr
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="sonarrUrl">Sonarr URL:</label>
+                        <input type="text" id="sonarrUrl" value="${config.sonarr?.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="sonarrApiKey">Sonarr API Key:</label>
+                        <input type="password" id="sonarrApiKey" value="${config.sonarr?.apiKey || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="sonarrDeleteEmptyShows" ${config.sonarr?.deleteEmptyShows ? 'checked' : ''}> 
+                            Delete Empty Shows
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="sonarrDetermineAgeBy">Determine Age By:</label>
+                        <select id="sonarrDetermineAgeBy">
+                            <option value="MostRecent" ${config.sonarr?.determineAgeBy === 'MostRecent' ? 'selected' : ''}>Most Recent</option>
+                            <option value="Oldest" ${config.sonarr?.determineAgeBy === 'Oldest' ? 'selected' : ''}>Oldest</option>
+                        </select>
+                    </div>
+
+                    <!-- Jellystat Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Jellystat Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellystatEnabled" ${config.jellystat?.enabled ? 'checked' : ''}> 
+                            Enable Jellystat
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="jellystatUrl">Jellystat URL:</label>
+                        <input type="text" id="jellystatUrl" value="${config.jellystat?.url || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label for="jellystatApiKey">Jellystat API Key:</label>
+                        <input type="password" id="jellystatApiKey" value="${config.jellystat?.apiKey || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="jellystatWholeTvShow" ${config.jellystat?.wholeTvShow ? 'checked' : ''}> 
+                            Whole TV Show Mode
+                        </label>
+                    </div>
+
+                    <!-- Media Deletion Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Media Deletion Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="mediaDeletionEnabled" ${config.mediaDeletion?.enabled ? 'checked' : ''}> 
+                            Enable Media Deletion
+                        </label>
+                    </div>
+
+                    <!-- Tag-Based Deletion Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Tag-Based Deletion Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="tagBasedDeletionEnabled" ${config.tagBasedDeletion?.enabled ? 'checked' : ''}> 
+                            Enable Tag-Based Deletion
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="minimumFreeDiskPercent">Minimum Free Disk Percent:</label>
+                        <input type="number" id="minimumFreeDiskPercent" value="${config.tagBasedDeletion?.minimumFreeDiskPercent || 80}" min="0" max="100">
+                    </div>
+
+                    <!-- Episode Deletion Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Episode Deletion Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="episodeDeletionEnabled" ${config.episodeDeletion?.enabled ? 'checked' : ''}> 
+                            Enable Episode Deletion
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeDeletionTag">Episode Deletion Tag:</label>
+                        <input type="text" id="episodeDeletionTag" value="${config.episodeDeletion?.tag || 'janitorr_daily'}">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxEpisodes">Max Episodes to Keep:</label>
+                        <input type="number" id="maxEpisodes" value="${config.episodeDeletion?.maxEpisodes || 10}" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxAge">Max Episode Age:</label>
+                        <input type="text" id="maxAge" value="${config.episodeDeletion?.maxAge || '30d'}" placeholder="30d">
+                    </div>
+
+                    <!-- Webhook Settings -->
+                    <h4 style="grid-column: 1/-1; color: #4a5568; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 20px;">Webhook Settings</h4>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="webhooksEnabled" ${config.webhooks?.enabled ? 'checked' : ''}> 
+                            Enable Webhooks
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="webhookRetryAttempts">Retry Attempts:</label>
+                        <input type="number" id="webhookRetryAttempts" value="${config.webhooks?.retryAttempts || 3}" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="webhookTimeoutSeconds">Timeout (seconds):</label>
+                        <input type="number" id="webhookTimeoutSeconds" value="${config.webhooks?.timeoutSeconds || 30}" min="1" max="300">
+                    </div>
+                </div>
+            `;
+        }
+
+        async function saveConfiguration() {
+            if (testMode) {
+                showAlert('In test mode. Use "Save Changes Permanently" to save.', 'warning');
+                return;
+            }
+
+            if (!currentConfig) {
+                showAlert('Please load configuration first', 'error');
+                return;
+            }
+
+            try {
+                collectConfigurationFromForm();
+                await saveConfigurationInternal();
+                
+                // Update original config to match saved config
+                originalConfig = JSON.parse(JSON.stringify(currentConfig));
+                
+            } catch (error) {
+                console.error('Failed to save configuration:', error);
+                showAlert('Failed to save configuration', 'error');
+            }
+        }
+
+        async function saveConfigurationInternal() {
+            const response = await fetch('/api/status/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(currentConfig)
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                showAlert(result.message || 'Configuration saved successfully', 'success');
+            } else {
+                showAlert('Failed to save configuration', 'error');
+                throw new Error('Save failed');
+            }
+        }
+
+        async function runAllCleanup(dryRun = true) {
+            const action = dryRun ? 'preview' : 'execution';
+            const confirmation = dryRun ? true : confirm(`Are you sure you want to run all cleanup operations? This will permanently delete media files that meet the configured criteria.`);
+            
+            if (!confirmation) return;
+
+            try {
+                showAlert(`Starting all cleanup ${action}...`, 'info');
+                
+                const response = await fetch(`/api/cleanup/run-all?dryRun=${dryRun}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const summary = `
+                        All cleanup ${action} completed!<br>
+                        Movies: ${result.moviesDeleted} ${dryRun ? 'would be' : 'were'} processed<br>
+                        Seasons: ${result.seasonsDeleted} ${dryRun ? 'would be' : 'were'} processed<br>
+                        Episodes: ${result.episodesDeleted} ${dryRun ? 'would be' : 'were'} processed<br>
+                        Tag-based: ${result.tagBasedDeleted} ${dryRun ? 'would be' : 'were'} processed<br>
+                        <strong>Total: ${result.totalDeleted} items</strong>
+                    `;
+                    showAlert(summary, 'success');
+                    refreshStatus();
+                } else {
+                    showAlert(`Failed to run all cleanup operations`, 'error');
+                }
+
+            } catch (error) {
+                console.error(`Failed to run all cleanup:`, error);
+                showAlert(`Failed to run all cleanup operations`, 'error');
+            }
+        }
+
+        async function runCleanup(type, dryRun = true) {
+            try {
+                const response = await fetch(`/api/cleanup/${type.toLowerCase()}?dryRun=${dryRun}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`${type} cleanup ${dryRun ? 'preview' : 'execution'} completed. ${result.deletedCount} items ${dryRun ? 'would be' : 'were'} processed.`, 'success');
+                    refreshStatus();
+                } else {
+                    showAlert(`Failed to run ${type} cleanup`, 'error');
+                }
+
+            } catch (error) {
+                console.error(`Failed to run ${type} cleanup:`, error);
+                showAlert(`Failed to run ${type} cleanup`, 'error');
+            }
+        }
+
+        function toggleConfigSection() {
+            const section = document.getElementById('configSection');
+            const isVisible = section.style.display !== 'none';
+            
+            if (isVisible) {
+                section.style.display = 'none';
+            } else {
+                section.style.display = 'block';
+                if (!currentConfig) {
+                    loadConfiguration();
+                }
+            }
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = message;
+            
+            container.appendChild(alertDiv);
+            
+            // Remove alert after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

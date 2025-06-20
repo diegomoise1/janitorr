@@ -1,0 +1,100 @@
+server:
+  port: 8978
+
+logging:
+  level:
+    com.github.schaka: DEBUG # Set to debug or trace to get more info about what Janitorr is doing
+  threshold:
+    file: NONE # Set to TRACE to enable file logging
+
+# File system access (same mapping as Sonarr, Radarr and Jellyfin) is required to delete TV shows by season and create "Leaving Soon" collections in Jellyfin# Currently, Jellyfin does not support an easy way to add only a few seasons or movies to a collection, we need access to temporary symlinks
+# Additionally, checks to prevent deletion on currently still seeding media currently require file system access as well
+file-system:
+  access: true
+  validate-seeding: false # validates seeding by checking if the original file exists and skips deletion - turning this off will send a delete to the *arrs even if a torrent may still be active
+  leaving-soon-dir: "/data/media/leaving-soon" # The directory that's known to Janitorr - this will contain new folders with symlinks to your media library for "Leaving Soon"
+  media-server-leaving-soon-dir: "/media/leaving-soon" # This is the directory Jellyfin/Emby will be told it can find the "Leaving Soon" library, in case its mapped differently
+  from-scratch: true # Clean up entire "Leaving Soon" directory and rebuild from scratch - this can help with clearing orphaned data - turning this off can save resources (less writes to drive)
+  free-space-check-dir: "/" # This is the default directory Janitorr uses to check how much space is left on your drives. By default, it checks the entire root - you may point it at a specific folder
+
+application:
+  dry-run: false
+  run-once: false # If you enable this, Janitorr will clean up once and then shut down.
+  whole-tv-show: false # activating this will treat as a whole show as recently download/watched from a single episode, rather than that episode's season - shows will be deleted as a whole
+  whole-show-seeding-check: false # Turning this off, disables the seeding check entirely if whole-tv-show is enabled. Activating this check will keep a whole TV show if any season is still seeding (requires file access).
+  leaving-soon: 14d # 14 days before a movie is deleted, it gets added to a "Leaving Soon" type collection (i.e. movies that are 76 to 89 days old)
+  exclusion-tag: "janitorr_keep" # Set this tag to your movies or TV shows in the *arrs to exclude media from being cleaned up
+
+  media-deletion:
+    enabled: true
+    movie-expiration:
+      # Percentage of free disk space to expiration time - if the highest given number is not reached, nothing will be deleted
+      # If filesystem access is not given, disk percentage can't be determined. As a result, Janitorr will always choose the largest expiration time.
+      80: 15d # 15 days
+      85: 30d # 1 month - if a movie's files on your system are older than this, they will be deleted
+      90: 60d # 2 months
+      95: 90d # 3 months
+    season-expiration:
+      80: 15d # 15 days
+      85: 20d # 20 days - if a season's files on your system are older than this, they will be deleted
+      90: 60d # 2 months
+      95: 120d # 4 months
+
+  tag-based-deletion:
+    enabled: true
+    minimum-free-disk-percent: 80
+    schedules:
+      - tag: 5 - demo
+        expiration: 30d
+      - tag: 10 - demo
+        expiration: 7d
+
+  episode-deletion: # This ignores Jellystat. Only grab history matters. It also doesn't clean up Jellyfin. There is NO seeding check either.
+    enabled: true
+    tag: janitorr_daily # Shows tagged with this will have all episodes of their LATEST season deleted by the below thresholds
+    max-episodes: 10 # maximum (latest) episodes of this season to keep
+    max-age: 30d # Maximum age to keep any episode at all - even the last 10 episodes would expire after 30 days in this example
+
+
+clients:
+  sonarr:
+    enabled: true
+    url: "http://192.168.1.193:8980/sonarr"
+    api-key: "48f8a65ca11f4a3383e01348a56eae71"
+    delete-empty-shows: true # Delete empty shows if deleting by season. Otherwise leaves Sonarr entries behind.
+    determine-age-by: MOST_RECENT # Optional property, use 'most_recent' or 'oldest' - remove this line if Janitorr should determine by upgrades enabled for your profile
+  radarr:
+    enabled: true
+    url: "http://192.168.1.193:7878/radarr"
+    api-key: "d281fdcf60834652bfcc9c1ff0361180"
+    only-delete-files: false # NOT RECOMMENDED - When set to true, Janitorr will only delete your media files but keep the entries in Radarr
+    determine-age-by: most_recent # Optional property, use 'most_recent' or 'oldest' - remove this line if Janitorr should determine by upgrades enabled for your profile
+  bazarr:
+    enabled: false # Only used if you want to copy over subtitle files managed by Bazarr
+    url: "http://192.168.1.193:6767"
+    api-key: "3684ec6899d7771146458eb47b409a1e"
+
+  ## You can only choose one out of Jellyfin or Emby.
+  ## User login is only needed if deletion is enabled.
+  jellyfin:
+    enabled: true
+    url: "http://192.168.1.193:8096"
+    api-key: "effbdb5827fd478e83e0106e12d60975"
+    username: janitorr
+    password: Froot4ever
+    delete: true # Jellyfin setup is required for JellyStat. However, if you don't want Janitorr to send delete requests to the Jellyfin API, disable it here    leaving-soon-tv: "Shows (Leaving Soon)"
+    leaving-soon-movies: "Movies (Leaving Soon)"
+    leaving-soon-type: MOVIES_AND_TV
+
+
+  jellyseerr:
+    enabled: true
+    url: "http://192.168.1.193:6025"
+    api-key: "MTc0OTkzODk2MDk2MDMxYTdkMTE2LTkxZWUtNDNmMy1iNzExLTc3ODRmOTQ1YjgxMQ=="
+    match-server: false # Enable if you have several Radarr/Sonarr instances set up in Jellyseerr. Janitorr will match them by the host+port supplied in their respective config settings.
+
+  jellystat: # Only one, Jellystat or Streamystats can be used
+    enabled: true
+    whole-tv-show: true # Enabling this will make Jellystat consider TV shows as a whole if any episode of any season has been watched
+    url: "http://192.168.1.193:3005"
+    api-key: "eb588c0e-d9f8-4f5b-80cb-37c529471e45"

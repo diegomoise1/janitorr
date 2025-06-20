@@ -1,0 +1,120 @@
+{
+  "Application": {
+    "DryRun": true,
+    "Webhooks": {
+      "Enabled": true,
+      "RetryAttempts": 3,
+      "TimeoutSeconds": 30,
+      "Endpoints": [
+        {
+          "Name": "Discord - All Events",
+          "Url": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
+          "Enabled": true,
+          "Events": [
+            "MediaMarkedForDeletion",
+            "MediaDeleted", 
+            "CleanupStarted",
+            "CleanupCompleted"
+          ],
+          "CleanupTypes": [
+            "Movie",
+            "Season"
+          ],
+          "Headers": {
+            "Content-Type": "application/json"
+          },
+          "AuthType": "None"
+        },
+        {
+          "Name": "Slack - Completion Only",
+          "Url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+          "Enabled": true,
+          "Events": [
+            "CleanupCompleted"
+          ],
+          "CleanupTypes": [],
+          "Headers": {},
+          "AuthType": "None"
+        },
+        {
+          "Name": "Custom API - Movies Only",
+          "Url": "https://your-api.example.com/webhooks/janitor",
+          "Enabled": true,
+          "Events": [
+            "MediaMarkedForDeletion",
+            "MediaDeleted",
+            "CleanupStarted", 
+            "CleanupCompleted",
+            "HealthCheck"
+          ],
+          "CleanupTypes": [
+            "Movie"
+          ],
+          "Headers": {
+            "X-Custom-Header": "janitor-webhook"
+          },
+          "AuthType": "Bearer",
+          "AuthToken": "your-bearer-token-here",
+          "Secret": "your-hmac-secret-for-signature-verification"
+        },
+        {
+          "Name": "Home Assistant - Status Updates",
+          "Url": "http://homeassistant.local:8123/api/webhook/janitor_media_cleanup",
+          "Enabled": true,
+          "Events": [
+            "CleanupStarted",
+            "CleanupCompleted"
+          ],
+          "CleanupTypes": [],
+          "Headers": {},
+          "AuthType": "ApiKey",
+          "AuthToken": "your-home-assistant-long-lived-token"
+        },
+        {
+          "Name": "Episode Cleanup Tracker",
+          "Url": "https://api.example.com/episode-cleanup",
+          "Enabled": true,
+          "Events": [
+            "MediaMarkedForDeletion",
+            "MediaDeleted"
+          ],
+          "CleanupTypes": [
+            "WeeklyEpisode"
+          ],
+          "Headers": {},
+          "AuthType": "Basic",
+          "AuthUsername": "username",
+          "AuthPassword": "password"
+        },
+        {
+          "Name": "Tag-Based Cleanup Monitor",
+          "Url": "https://monitoring.example.com/webhooks/tag-cleanup",
+          "Enabled": true,
+          "Events": [
+            "MediaMarkedForDeletion",
+            "MediaDeleted"
+          ],
+          "CleanupTypes": [
+            "TagBased"
+          ],
+          "Headers": {
+            "X-Monitoring-Source": "janitor-asp"
+          },
+          "AuthType": "Bearer",
+          "AuthToken": "monitor-bearer-token"
+        },
+        {
+          "Name": "Disabled Example",
+          "Url": "https://example.com/webhook",
+          "Enabled": false,
+          "Events": [
+            "MediaDeleted"
+          ],
+          "CleanupTypes": [],
+          "Headers": {},
+          "AuthType": "None"
+        }
+      ]
+    }
+  }
+}

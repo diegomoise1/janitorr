@@ -1,0 +1,6 @@
+@JanitorAspNet_HostAddress = http://localhost:5245
+
+GET {{JanitorAspNet_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
