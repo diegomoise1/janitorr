@@ -123,6 +123,7 @@ builder.Services.AddScoped<ICacheService, MemoryCacheService>();
 // Configure background task queue
 builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
 builder.Services.AddHostedService<QueuedHostedService>();
+builder.Services.AddHostedService<CleanupBackgroundService>();
 
 // Add application services
 builder.Services.AddScoped<ICleanupService, CleanupService>();
