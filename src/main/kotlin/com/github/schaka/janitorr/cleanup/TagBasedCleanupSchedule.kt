@@ -16,6 +16,7 @@ import com.github.schaka.janitorr.servarr.radarr.Radarr
 import com.github.schaka.janitorr.servarr.radarr.RadarrRestService
 import com.github.schaka.janitorr.servarr.sonarr.Sonarr
 import com.github.schaka.janitorr.servarr.sonarr.SonarrRestService
+import com.github.schaka.janitorr.webhook.WebhookService
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.scheduling.annotation.Scheduled
@@ -31,7 +32,8 @@ class TagBasedCleanupSchedule(
     runOnce: RunOnce,
     @Sonarr sonarrService: ServarrService,
     @Radarr radarrService: ServarrService,
-) : AbstractCleanupSchedule(CleanupType.TAG, mediaServerService, jellyseerrService, jellystatService, fileSystemProperties, applicationProperties, runOnce, sonarrService, radarrService) {
+    webhookService: WebhookService
+) : AbstractCleanupSchedule(CleanupType.TAG, mediaServerService, jellyseerrService, jellystatService, fileSystemProperties, applicationProperties, runOnce, sonarrService, radarrService, webhookService) {
 
     companion object {
         private val log = LoggerFactory.getLogger(this::class.java.enclosingClass)

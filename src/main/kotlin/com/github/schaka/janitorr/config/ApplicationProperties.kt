@@ -12,6 +12,8 @@ data class ApplicationProperties(
         val tagBasedDeletion: TagDeletion,
         @NestedConfigurationProperty
         val episodeDeletion: EpisodeDeletion,
+        @NestedConfigurationProperty
+        val webhooks: WebhookProperties = WebhookProperties(),
         val runOnce: Boolean = false,
         val dryRun: Boolean = false,
         val wholeTvShow: Boolean = false,

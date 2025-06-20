@@ -69,8 +69,8 @@ If you have any questions, consult the [FAQ section](https://github.com/Schaka/j
 
 ## Setup
 
-Currently, the code is only published as a docker image to [GitHub](https://github.com/Schaka/janitorr/pkgs/container/janitorr).
-If you cannot use Docker, you'll have to compile it yourself from source.
+Currently, the code is published as a docker image to [GitHub](https://github.com/Schaka/janitorr/pkgs/container/janitorr).
+You can also build the image yourself from source using the provided Dockerfile.
 
 Depending on the configuration, files will be deleted if they are older than x days. Age is determined by your grab
 history in the *arr apps. By default, it will choose the oldest file in the history.
@@ -78,6 +78,23 @@ If Jellystat is set up, the most recent watch date overwrites the grab history, 
 
 To exclude media from being considered from deletion, set the `janitorr_keep` tag in Sonarr/Radarr. The actual tag
 Janitorr looks for can be adjusted in your config file.
+
+### Building from Source with Docker
+
+You can build Janitorr directly from this repository:
+
+```bash
+# Standard JVM image (recommended)
+docker build -t janitorr:latest .
+
+# Native image (smaller, faster startup, longer build time)  
+docker build -f Dockerfile.native -t janitorr:native .
+
+# Using docker-compose
+docker-compose up -d
+```
+
+For detailed Docker instructions, including Portainer integration, see [DOCKER.md](DOCKER.md).
 
 ### Setting up Docker
 
@@ -170,6 +187,45 @@ services:
 
 To get the latest build as found in the development branch, grab the following image: `ghcr.io/schaka/janitorr:develop`.
 The development version of the native image is available as `ghcr.io/schaka/janitorr:native-develop`.
+
+## Development
+
+### Local Building
+
+For local development and testing, you can build Docker images locally without pushing them to remote registries.
+
+#### JVM Image (using Jib)
+```bash
+# Build JVM image locally
+SKIP_PUSH=true ./gradlew jibDockerBuild
+```
+
+This will create a local Docker image tagged as `schaka/janitorr:latest` and `schaka/janitorr:local`.
+
+#### Native Image (using Spring Boot)
+```bash
+# Build native image locally  
+SKIP_PUSH=true ./gradlew bootBuildImage
+```
+
+This will create a local Docker image tagged as `schaka/janitorr:native-local` and `schaka/janitorr:native-latest`.
+
+#### Running Local Images
+```bash
+# Run the JVM image
+docker run -p 8978:8978 schaka/janitorr:latest
+
+# Run the native image  
+docker run -p 8978:8978 schaka/janitorr:native-latest
+```
+
+### CI/CD Workflows
+
+The project uses three GitHub Actions workflows:
+
+- **Local Development Build** (`local-build.yml`): Runs on pushes to main and all PRs, builds images locally without pushing
+- **JVM Image** (`jib-jvm-image.yml`): Runs on merges to main and tagged releases, builds and pushes JVM images to GitHub Container Registry
+- **Native Images** (`native-image.yml`): Runs on merges to main and tagged releases, builds and pushes multi-platform native images to GitHub Container Registry
 
 
 ## JetBrains

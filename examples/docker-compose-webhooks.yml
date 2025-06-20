@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  janitorr:
+    image: ghcr.io/schaka/janitorr:latest
+    container_name: janitorr
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+      - ./logs:/logs
+      - /path/to/your/media:/data/media  # Replace with your actual media path
+    ports:
+      - "8978:8978"
+    environment:
+      - TZ=Europe/London
+    # Optional: Add webhook receiver service
+    depends_on:
+      - webhook-receiver
+
+  # Example webhook receiver service
+  webhook-receiver:
+    build:
+      context: .
+      dockerfile: webhook-receiver.Dockerfile
+    container_name: janitorr-webhook-receiver
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - WEBHOOK_SECRET=your-webhook-secret-here
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR/WEBHOOK/URL
+    volumes:
+      - ./webhook_logs:/app/logs
+
+  # Example notification service (ntfy.sh)
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./ntfy/cache:/var/cache/ntfy
+      - ./ntfy/etc:/etc/ntfy
+    command: serve
+
+volumes:
+  janitorr_config:
+  janitorr_logs:
+  webhook_logs:
+  ntfy_cache:
+  ntfy_etc:

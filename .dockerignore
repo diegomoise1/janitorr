@@ -1,0 +1,54 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+build/
+target/
+*.jar
+*.war
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+images/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+
+# Node modules (if any)
+node_modules/
+
+# Test results
+test-results/
+coverage/
+
+# Examples directory
+examples/

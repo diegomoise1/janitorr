@@ -2,6 +2,7 @@ package com.github.schaka.janitorr.cleanup
 
 import com.github.schaka.janitorr.config.ApplicationProperties
 import com.github.schaka.janitorr.config.FileSystemProperties
+import com.github.schaka.janitorr.config.WebhookEvent
 import com.github.schaka.janitorr.jellyseerr.JellyseerrService
 import com.github.schaka.janitorr.stats.StatsService
 import com.github.schaka.janitorr.mediaserver.AbstractMediaServerService
@@ -10,6 +11,9 @@ import com.github.schaka.janitorr.mediaserver.library.LibraryType.MOVIES
 import com.github.schaka.janitorr.mediaserver.library.LibraryType.TV_SHOWS
 import com.github.schaka.janitorr.servarr.LibraryItem
 import com.github.schaka.janitorr.servarr.ServarrService
+import com.github.schaka.janitorr.webhook.WebhookPayload
+import com.github.schaka.janitorr.webhook.WebhookMediaItem
+import com.github.schaka.janitorr.webhook.WebhookService
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Duration
@@ -26,6 +30,7 @@ abstract class AbstractCleanupSchedule(
     protected val runOnce: RunOnce,
     protected val sonarrService: ServarrService,
     protected val radarrService: ServarrService,
+    protected val webhookService: WebhookService? = null
 ) {
 
     companion object {
@@ -47,11 +52,30 @@ abstract class AbstractCleanupSchedule(
             return
         }
 
+        // Send cleanup started webhook
+        webhookService?.sendWebhook(
+            WebhookPayload(
+                event = WebhookEvent.CLEANUP_STARTED,
+                timestamp = LocalDateTime.now(),
+                cleanupType = cleanupType,
+                items = emptyList()
+            )
+        )
+
         when (libraryType) {
             TV_SHOWS -> cleanupMediaType(libraryType, sonarrService, expiration, this::deleteTvShows, entryFilter, onlyAddLinks)
             MOVIES -> cleanupMediaType(libraryType, radarrService, expiration, this::deleteMovies, entryFilter, onlyAddLinks)
         }
 
+        // Send cleanup completed webhook
+        webhookService?.sendWebhook(
+            WebhookPayload(
+                event = WebhookEvent.CLEANUP_COMPLETED,
+                timestamp = LocalDateTime.now(),
+                cleanupType = cleanupType,
+                items = emptyList()
+            )
+        )
     }
 
     abstract fun needToDelete(type: LibraryType): Boolean
@@ -90,6 +114,16 @@ abstract class AbstractCleanupSchedule(
     }
 
     protected fun deleteMovies(toDeleteMovies: List<LibraryItem>) {
+        // Send webhook before deletion
+        webhookService?.sendWebhook(
+            WebhookPayload(
+                event = WebhookEvent.MEDIA_MARKED_FOR_DELETION,
+                timestamp = LocalDateTime.now(),
+                cleanupType = cleanupType,
+                items = toDeleteMovies.map { WebhookMediaItem.fromLibraryItem(it) }
+            )
+        )
+
         radarrService.removeEntries(toDeleteMovies)
 
         val cannotDeleteMovies = toDeleteMovies.filter { it.seeding }
@@ -98,9 +132,31 @@ abstract class AbstractCleanupSchedule(
         jellyseerrService.cleanupRequests(deletedMovies)
         mediaServerService.cleanupMovies(deletedMovies)
         mediaServerService.updateLeavingSoon(cleanupType, MOVIES, cannotDeleteMovies, true)
+
+        // Send webhook after deletion
+        if (deletedMovies.isNotEmpty()) {
+            webhookService?.sendWebhook(
+                WebhookPayload(
+                    event = WebhookEvent.MEDIA_DELETED,
+                    timestamp = LocalDateTime.now(),
+                    cleanupType = cleanupType,
+                    items = deletedMovies.map { WebhookMediaItem.fromLibraryItem(it) }
+                )
+            )
+        }
     }
 
     protected fun deleteTvShows(toDeleteShows: List<LibraryItem>) {
+        // Send webhook before deletion
+        webhookService?.sendWebhook(
+            WebhookPayload(
+                event = WebhookEvent.MEDIA_MARKED_FOR_DELETION,
+                timestamp = LocalDateTime.now(),
+                cleanupType = cleanupType,
+                items = toDeleteShows.map { WebhookMediaItem.fromLibraryItem(it) }
+            )
+        )
+
         sonarrService.removeEntries(toDeleteShows)
 
         val cannotDeleteShow = toDeleteShows.filter { it.seeding }
@@ -109,6 +165,18 @@ abstract class AbstractCleanupSchedule(
         jellyseerrService.cleanupRequests(deletedShows)
         mediaServerService.cleanupTvShows(deletedShows)
         mediaServerService.updateLeavingSoon(cleanupType, TV_SHOWS, cannotDeleteShow, true)
+
+        // Send webhook after deletion
+        if (deletedShows.isNotEmpty()) {
+            webhookService?.sendWebhook(
+                WebhookPayload(
+                    event = WebhookEvent.MEDIA_DELETED,
+                    timestamp = LocalDateTime.now(),
+                    cleanupType = cleanupType,
+                    items = deletedShows.map { WebhookMediaItem.fromLibraryItem(it) }
+                )
+            )
+        }
     }
 
     private fun logKeep(item: LibraryItem) {

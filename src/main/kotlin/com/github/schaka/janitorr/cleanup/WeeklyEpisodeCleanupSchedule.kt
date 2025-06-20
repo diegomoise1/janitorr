@@ -1,6 +1,7 @@
 package com.github.schaka.janitorr.cleanup
 
 import com.github.schaka.janitorr.config.ApplicationProperties
+import com.github.schaka.janitorr.config.WebhookEvent
 import com.github.schaka.janitorr.servarr.bazarr.BazarrRestService
 import com.github.schaka.janitorr.servarr.data_structures.Tag
 import com.github.schaka.janitorr.servarr.history.HistoryResponse
@@ -9,6 +10,11 @@ import com.github.schaka.janitorr.servarr.sonarr.SonarrClient
 import com.github.schaka.janitorr.servarr.sonarr.SonarrProperties
 import com.github.schaka.janitorr.servarr.sonarr.SonarrRestService
 import com.github.schaka.janitorr.servarr.sonarr.episodes.EpisodeResponse
+import com.github.schaka.janitorr.webhook.WebhookPayload
+import com.github.schaka.janitorr.webhook.WebhookMediaItem
+import com.github.schaka.janitorr.webhook.WebhookService
+import com.github.schaka.janitorr.mediaserver.library.LibraryType
+import com.github.schaka.janitorr.servarr.LibraryItem
 import org.slf4j.LoggerFactory
 import org.springframework.aot.hint.annotation.RegisterReflectionForBinding
 import org.springframework.cache.annotation.CacheEvict
@@ -28,6 +34,7 @@ class WeeklyEpisodeCleanupSchedule(
         val sonarrProperties: SonarrProperties,
         val sonarrClient: SonarrClient,
         val runOnce: RunOnce,
+        val webhookService: WebhookService? = null,
 
         var episodeTag: Tag = Tag(Integer.MIN_VALUE, "Not_Set")
 ) {
@@ -55,6 +62,7 @@ class WeeklyEpisodeCleanupSchedule(
 
         val today = LocalDateTime.now()
         val series = sonarrClient.getAllSeries().filter { it.tags.contains(episodeTag.id) }
+        val allTags = sonarrClient.getAllTags()
 
         for (show in series) {
             val latestSeason = show.seasons.maxBy { season -> season.seasonNumber }
@@ -62,6 +70,8 @@ class WeeklyEpisodeCleanupSchedule(
                 .filter { it.airDate != null }
                 .filter { LocalDate.parse(it.airDate!!) <= today.toLocalDate() }
                 .toMutableList()
+
+            val episodesToDelete = mutableListOf<EpisodeResponse>()
 
             val episodesHistory = sonarrClient.getHistory(show.id, latestSeason.seasonNumber)
                     .sortedBy { parseDate(it.date)}
@@ -77,6 +87,7 @@ class WeeklyEpisodeCleanupSchedule(
                     log.trace("Deleting episode ${episode.episodeNumber} of ${show.title} S${latestSeason.seasonNumber} because of its age")
 
                     if (episode.episodeFileId != null && episode.episodeFileId != 0) {
+                        episodesToDelete.add(episode)
                         if (!applicationProperties.dryRun) {
                             sonarrClient.deleteEpisodeFile(episode.episodeFileId)
                             episodes.remove(episode)
@@ -94,11 +105,42 @@ class WeeklyEpisodeCleanupSchedule(
                     log.trace("Deleting episode ${episode.episodeNumber} of ${show.title} S${latestSeason.seasonNumber} because there are too many episodes")
 
                     if (episode.episodeFileId != null && episode.episodeFileId != 0) {
+                        episodesToDelete.add(episode)
                         if (!applicationProperties.dryRun) {
                             sonarrClient.deleteEpisodeFile(episode.episodeFileId)
                         }
                     }
                 }
+            }
+
+            // Send webhook for deleted episodes
+            if (episodesToDelete.isNotEmpty()) {
+                val webhookItems = episodesToDelete.map { episode ->
+                    WebhookMediaItem(
+                        id = episode.id,
+                        title = "${show.title} - S${latestSeason.seasonNumber}E${episode.episodeNumber}: ${episode.title}",
+                        libraryType = LibraryType.TV_SHOWS,
+                        imdbId = show.imdbId,
+                        tmdbId = show.tvdbId,
+                        parentPath = show.path,
+                        originalPath = show.path,
+                        season = latestSeason.seasonNumber,
+                        tags = allTags.filter { tag -> show.tags.contains(tag.id) }.map { tag -> tag.label },
+                        importedDate = null,
+                        lastSeen = null,
+                        historyAge = today,
+                        seeding = false
+                    )
+                }
+
+                webhookService?.sendWebhook(
+                    WebhookPayload(
+                        event = WebhookEvent.MEDIA_MARKED_FOR_DELETION,
+                        timestamp = today,
+                        cleanupType = CleanupType.WEEKLY_EPISODE,
+                        items = webhookItems
+                    )
+                )
             }
         }
 

@@ -1,0 +1,119 @@
+# Example Janitorr configuration with webhooks enabled
+server:
+  port: 8978
+
+logging:
+  level:
+    com.github.schaka: INFO
+  threshold:
+    file: TRACE
+
+file-system:
+  access: true
+  validate-seeding: true
+  leaving-soon-dir: "/data/media/leaving-soon"
+  media-server-leaving-soon-dir: "/data/media/leaving-soon"
+  from-scratch: true
+  free-space-check-dir: "/"
+
+application:
+  dry-run: false  # Set to true for testing
+  run-once: false
+  whole-tv-show: false
+  leaving-soon: 14d
+  exclusion-tag: "janitorr_keep"
+
+  media-deletion:
+    enabled: true
+    movie-expiration:
+      10: 30d
+      20: 90d
+    season-expiration:
+      10: 20d
+      20: 120d
+
+  tag-based-deletion:
+    enabled: true
+    minimum-free-disk-percent: 15
+    schedules:
+      - tag: "old-movies"
+        expiration: 30d
+
+  episode-deletion:
+    enabled: false
+    tag: "janitorr_daily"
+    max-episodes: 10
+    max-age: 30d
+
+  # 🚨 WEBHOOK CONFIGURATION 🚨
+  webhooks:
+    enabled: true                    # Enable webhook functionality
+    retry-attempts: 3               # Retry failed webhooks 3 times
+    timeout-seconds: 30             # 30 second timeout for HTTP requests
+    endpoints:
+      # Discord webhook example
+      - url: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+        events:
+          - MEDIA_MARKED_FOR_DELETION
+          - MEDIA_DELETED
+        headers:
+          Content-Type: "application/json"
+      
+      # Custom webhook receiver example  
+      - url: "http://webhook-receiver:5000/janitorr-webhook"
+        events:
+          - MEDIA_MARKED_FOR_DELETION
+          - MEDIA_DELETED
+          - CLEANUP_STARTED
+          - CLEANUP_COMPLETED
+        headers:
+          Authorization: "Bearer your-api-token"
+          X-Source: "janitorr"
+        secret: "your-webhook-secret-for-hmac-verification"
+      
+      # ntfy.sh notification example
+      - url: "http://ntfy:80/janitorr-notifications"
+        events:
+          - MEDIA_MARKED_FOR_DELETION
+        headers:
+          Title: "Janitorr Media Cleanup"
+          Priority: "default"
+          Tags: "warning,janitorr"
+
+      # Home Assistant webhook example
+      - url: "http://homeassistant:8123/api/webhook/janitorr_webhook_id"
+        events:
+          - MEDIA_MARKED_FOR_DELETION
+          - CLEANUP_COMPLETED
+        headers:
+          Authorization: "Bearer YOUR_HOME_ASSISTANT_TOKEN"
+
+clients:
+  sonarr:
+    enabled: true
+    url: "http://sonarr:8989"
+    api-key: "YOUR_SONARR_API_KEY"
+    delete-empty-shows: true
+
+  radarr:
+    enabled: true
+    url: "http://radarr:7878"
+    api-key: "YOUR_RADARR_API_KEY"
+    only-delete-files: false
+
+  jellyfin:
+    enabled: true
+    url: "http://jellyfin:8096"
+    api-key: "YOUR_JELLYFIN_API_KEY"
+    username: "janitorr"
+    password: "your-jellyfin-password"
+    delete: true
+    leaving-soon-tv: "Shows (Leaving Soon)"
+    leaving-soon-movies: "Movies (Leaving Soon)"
+    leaving-soon-type: MOVIES_AND_TV
+
+  jellyseerr:
+    enabled: true
+    url: "http://jellyseerr:5055"
+    api-key: "YOUR_JELLYSEERR_API_KEY"
+    match-server: false

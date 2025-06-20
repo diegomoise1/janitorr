@@ -1,0 +1,73 @@
+# Portainer Stack Template for Janitorr
+# 
+# To use this template:
+# 1. Copy this content
+# 2. In Portainer, go to Stacks -> Add Stack  
+# 3. Paste this content
+# 4. Adjust the volume paths to match your system
+# 5. Deploy the stack
+
+version: '3.8'
+
+services:
+  janitorr:
+    build:
+      context: https://github.com/Schaka/janitorr.git
+      dockerfile: Dockerfile
+    container_name: janitorr
+    restart: unless-stopped
+    ports:
+      - "8978:8978"
+    volumes:
+      # IMPORTANT: Adjust these paths to match your system
+      # Configuration (create this directory and add your application.yml)
+      - /opt/janitorr/config:/config:ro
+      # Logs
+      - /opt/janitorr/logs:/logs
+      # Media library (adjust to your media location)
+      - /mnt/media:/data/media:ro
+      # Leaving soon directory for collections
+      - /opt/janitorr/leaving-soon:/data/media/leaving-soon
+    environment:
+      - TZ=America/New_York  # Adjust to your timezone
+      # Uncomment and adjust if you need custom JVM settings
+      # - JAVA_OPTS=-Xms512m -Xmx2048m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8978/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      # Portainer labels for easier management
+      - "portainer.stack.name=janitorr"
+      - "portainer.app.description=Media library cleanup tool"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+# Optional: Uncomment if you want persistent volumes instead of bind mounts
+# volumes:
+#   janitorr_config:
+#   janitorr_logs:
+#   leaving_soon:
+
+# Instructions for setup:
+# 
+# 1. Create directories on your host:
+#    sudo mkdir -p /opt/janitorr/{config,logs,leaving-soon}
+#    sudo chown -R 1000:1000 /opt/janitorr
+#
+# 2. Create configuration file:
+#    Download application-template.yml from the repository
+#    Copy it to /opt/janitorr/config/application.yml
+#    Edit with your API keys and settings
+#
+# 3. Adjust volume paths above to match your media locations
+#
+# 4. Deploy this stack in Portainer
+#
+# 5. Monitor logs and health status in Portainer interface

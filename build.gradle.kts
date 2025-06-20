@@ -183,9 +183,13 @@ tasks.withType<ProcessAot> {
 
 tasks.withType<BootBuildImage> {
 
-    docker.publishRegistry.url = "ghcr.io"
-    docker.publishRegistry.username = System.getenv("USERNAME") ?: "INVALID_USER"
-    docker.publishRegistry.password = System.getenv("GITHUB_TOKEN") ?: "INVALID_PASSWORD"
+    val skipPush = System.getenv("SKIP_PUSH") == "true"
+    
+    if (!skipPush) {
+        docker.publishRegistry.url = "ghcr.io"
+        docker.publishRegistry.username = System.getenv("USERNAME") ?: "INVALID_USER"
+        docker.publishRegistry.password = System.getenv("GITHUB_TOKEN") ?: "INVALID_PASSWORD"
+    }
 
     builder = "paketobuildpacks/builder-jammy-buildpackless-tiny"
     buildpacks = listOf(
@@ -193,9 +197,22 @@ tasks.withType<BootBuildImage> {
         "paketobuildpacks/java-native-image",
         "paketobuildpacks/health-checker"
     )
-    imageName = project.extra["native.image.name"] as String
+    
+    imageName = if (skipPush) {
+        // For local builds, use a simple tag without registry prefix
+        "${project.extra["docker.image.name"]}:native-local"
+    } else {
+        project.extra["native.image.name"] as String
+    }
+    
     version = project.extra["docker.image.version"] as String
-    tags = project.extra["native.image.tags"] as List<String>
+    
+    tags = if (skipPush) {
+        listOf("${project.extra["docker.image.name"]}:native-latest")
+    } else {
+        project.extra["native.image.tags"] as List<String>
+    }
+    
     createdDate = "now"
 
     // It would also be possible to set this in the graalVmNative block, but we don't want to overwrite Spring's settings
@@ -213,13 +230,21 @@ tasks.withType<BootBuildImage> {
 }
 
 jib {
+    val skipPush = System.getenv("SKIP_PUSH") == "true"
+    
     to {
-        image = "ghcr.io/${project.extra["docker.image.name"]}"
-        tags = project.extra["docker.image.tags"] as Set<String>
-
-        auth {
-            username = System.getenv("USERNAME")
-            password = System.getenv("GITHUB_TOKEN")
+        if (skipPush) {
+            // For local builds, use a simple tag without registry prefix
+            image = "${project.extra["docker.image.name"]}"
+            tags = setOf("latest", "local")
+        } else {
+            image = "ghcr.io/${project.extra["docker.image.name"]}"
+            tags = project.extra["docker.image.tags"] as Set<String>
+            
+            auth {
+                username = System.getenv("USERNAME")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
     from {

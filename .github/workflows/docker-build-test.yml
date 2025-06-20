@@ -1,0 +1,76 @@
+name: Docker Build Test
+
+on:
+  push:
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'src/**'
+      - 'build.gradle.kts'
+      - '.github/workflows/docker-build-test.yml'
+    branches:
+      - 'main'
+      - 'develop'
+
+  pull_request:
+    paths:
+      - 'Dockerfile*'
+      - 'docker-compose.yml'
+      - 'src/**'
+      - 'build.gradle.kts'
+      - '.github/workflows/docker-build-test.yml'
+
+jobs:
+  test-docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Test standard Dockerfile build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: janitorr:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image startup
+        run: |
+          # Start the container in background
+          docker run -d \
+            --name janitorr-test \
+            -p 8978:8978 \
+            -e SPRING_PROFILES_ACTIVE=test \
+            janitorr:test
+          
+          # Wait for startup
+          sleep 30
+          
+          # Check if container is running
+          if ! docker ps | grep -q janitorr-test; then
+            echo "Container failed to start"
+            docker logs janitorr-test
+            exit 1
+          fi
+          
+          # Test health endpoint
+          if ! curl -f http://localhost:8978/health; then
+            echo "Health check failed"
+            docker logs janitorr-test
+            exit 1
+          fi
+          
+          echo "Docker build test successful!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop janitorr-test || true
+          docker rm janitorr-test || true

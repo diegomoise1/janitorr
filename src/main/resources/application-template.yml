@@ -56,6 +56,24 @@ application:
     max-episodes: 10 # maximum (latest) episodes of this season to keep
     max-age: 30d # Maximum age to keep any episode at all - even the last 10 episodes would expire after 30 days in this example
 
+  webhooks: # Send HTTP POST requests when media is marked for deletion or deleted
+    enabled: false
+    retry-attempts: 3 # Number of times to retry failed webhook calls
+    timeout-seconds: 30 # Timeout for webhook HTTP requests
+    endpoints:
+      - url: "https://your-webhook-endpoint.com/janitorr"
+        events: # List of events to send to this endpoint (MEDIA_MARKED_FOR_DELETION, MEDIA_DELETED, CLEANUP_STARTED, CLEANUP_COMPLETED)
+          - MEDIA_MARKED_FOR_DELETION
+          - MEDIA_DELETED
+        headers: # Optional custom headers
+          Authorization: "Bearer your-secret-token"
+          Content-Type: "application/json"
+        secret: "your-webhook-secret" # Optional HMAC secret for webhook signature verification
+      # - url: "https://another-endpoint.com/webhooks"
+      #   events:
+      #     - CLEANUP_STARTED
+      #     - CLEANUP_COMPLETED
+
 
 clients:
   sonarr:

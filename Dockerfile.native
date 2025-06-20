@@ -1,0 +1,79 @@
+# Dockerfile.native for Janitorr - GraalVM Native Image
+# This creates a smaller, faster-starting native image but takes longer to build
+
+# Build stage with GraalVM
+FROM ghcr.io/graalvm/graalvm-community:23 AS builder
+
+# Install native-image
+RUN gu install native-image
+
+WORKDIR /workspace/app
+
+# Copy Gradle wrapper and build files
+COPY gradlew .
+COPY gradle gradle
+COPY build.gradle.kts .
+COPY settings.gradle.kts .
+COPY gradle.properties .
+COPY buildSrc buildSrc
+
+# Make gradlew executable
+RUN chmod +x ./gradlew
+
+# Download dependencies
+RUN ./gradlew dependencies --no-daemon
+
+# Copy source code
+COPY src src
+
+# Build native image
+RUN ./gradlew nativeCompile --no-daemon
+
+# Runtime stage with minimal base image
+FROM ubuntu:noble-20241015
+
+LABEL org.opencontainers.image.title="Janitorr Native"
+LABEL org.opencontainers.image.description="Cleans up your media library (Native Image)"
+LABEL org.opencontainers.image.authors="Schaka <schaka@github.com>"
+LABEL org.opencontainers.image.source="https://github.com/Schaka/janitorr"
+
+# Install required packages for native image
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        libgcc-s1 \
+        zlib1g && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r janitorr && useradd -r -g janitorr janitorr
+
+# Create directories
+RUN mkdir -p /config /workspace /logs && \
+    chown -R janitorr:janitorr /config /workspace /logs
+
+# Copy the native executable
+COPY --from=builder --chown=janitorr:janitorr /workspace/app/build/native/nativeCompile/janitorr /workspace/janitorr
+
+# Make executable
+RUN chmod +x /workspace/janitorr
+
+# Switch to non-root user
+USER janitorr
+
+# Set working directory
+WORKDIR /workspace
+
+# Expose port
+EXPOSE 8978
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8978/health || exit 1
+
+# Native image doesn't need JVM options, but we can set Spring config location
+ENV SPRING_CONFIG_ADDITIONAL_LOCATION="optional:file:/config/application.yaml,optional:file:/workspace/application.yaml,optional:file:/workspace/application.yml"
+
+# Run the native executable
+CMD ["./janitorr"]
