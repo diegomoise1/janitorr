@@ -168,7 +168,7 @@ public class WebhookController : ControllerBase
             {
                 Id = random.Next(1, 1000),
                 Title = titles[random.Next(titles.Length)],
-                LibraryType = isMovie ? LibraryType.Movies : LibraryType.Shows,
+                LibraryType = isMovie ? LibraryType.Movie : LibraryType.TvShow,
                 ImdbId = $"tt{random.Next(1000000, 9999999)}",
                 TmdbId = random.Next(1000, 99999),
                 ParentPath = $"/data/media/{(isMovie ? "movies" : "tv")}/Test Movie {i}",

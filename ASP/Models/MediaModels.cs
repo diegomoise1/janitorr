@@ -183,14 +183,6 @@ public record LibraryItem
     public List<int> Tags { get; init; } = new();
 }
 
-public record WebhookEndpoint
-{
-    public string Url { get; init; } = "";
-    public string Secret { get; init; } = "";
-    public List<string> Events { get; init; } = new();
-    public bool Enabled { get; init; } = true;
-}
-
 public record WebhookEndpointStatus
 {
     public string Name { get; init; } = "";

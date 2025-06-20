@@ -4,6 +4,7 @@ using JanitorAspNet.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using WebhookEndpoint = JanitorAspNet.Configuration.WebhookEndpoint;
 
 namespace JanitorAspNet.Controllers;
 
